@@ -134,6 +134,7 @@ public class JoystickActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        this.bleDevices = new ArrayList<BluetoothDevice>();
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.main);
@@ -157,6 +158,23 @@ public class JoystickActivity extends AppCompatActivity {
         angleTextView = (TextView) findViewById(R.id.txtAngle);
         powerTextView = (TextView) findViewById(R.id.txtPower);
         directionTextView = (TextView) findViewById(R.id.txtDirection);
+        this.btnConnect = (Button) findViewById(R.id.btnConnect);
+
+        btnConnect.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                //
+                Button btn = (Button)v;
+                Log.i("btnConnect:onClick", "Clicked, txt: " + btn.getText());
+                if (btn.getText().equals("Connect")) {
+                    // connect BLE
+                    bleConnect();
+                } else {
+                    // Disconnect BLE
+                    bleDisconnect();
+                }
+            }
+        });
 
         //Event listener that always returns the variation of the angle in degrees, motion power in percentage and direction of movement
         joystick.setOnJoystickMoveListener(new OnJoystickMoveListener() {
@@ -210,14 +228,6 @@ public class JoystickActivity extends AppCompatActivity {
         delayedHide(100);
     }
 
-    private void toggle() {
-        if (mVisible) {
-            hide();
-        } else {
-            show();
-        }
-    }
-
     private void hide() {
         // Hide UI first
         ActionBar actionBar = getSupportActionBar();
@@ -229,18 +239,6 @@ public class JoystickActivity extends AppCompatActivity {
         // Schedule a runnable to remove the status and navigation bar after a delay
         mHideHandler.removeCallbacks(mShowPart2Runnable);
         mHideHandler.postDelayed(mHidePart2Runnable, UI_ANIMATION_DELAY);
-    }
-
-    @SuppressLint("InlinedApi")
-    private void show() {
-        // Show the system bar
-        mContentView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
-        mVisible = true;
-
-        // Schedule a runnable to display UI elements after a delay
-        mHideHandler.removeCallbacks(mHidePart2Runnable);
-        mHideHandler.postDelayed(mShowPart2Runnable, UI_ANIMATION_DELAY);
     }
 
     /**
@@ -301,9 +299,9 @@ public class JoystickActivity extends AppCompatActivity {
     }
 
     private void scanLeDevice(final boolean enable) {
-        this.bleDevices.clear();
 
         if (enable) {
+            this.bleDevices.clear();
             mHandler.postDelayed(new Runnable() {
                 @Override
                 public void run() {
@@ -337,13 +335,19 @@ public class JoystickActivity extends AppCompatActivity {
             Log.i("result", result.toString());
             BluetoothDevice btDevice = result.getDevice();
             addBle(btDevice);
+            // Disable scan
+            scanLeDevice(false);
         }
 
         @Override
         public void onBatchScanResults(List<ScanResult> results) {
             for (ScanResult sr : results) {
                 Log.i("ScanResult - Results", sr.toString());
+                BluetoothDevice btDevice = sr.getDevice();
+                addBle(btDevice);
             }
+            // Disable scan
+            scanLeDevice(false);
         }
 
         @Override
@@ -362,16 +366,38 @@ public class JoystickActivity extends AppCompatActivity {
                         public void run() {
                             Log.i("onLeScan", device.toString());
                             addBle(device);
+                            // Disable scan
+                            scanLeDevice(false);
                         }
                     });
                 }
             };
 
-    public void connectToDevice(BluetoothDevice device) {
+    public void bleConnect() {
+        BluetoothDevice device = this.bleDevices.get(this.spnBleList.getSelectedItemPosition());
         if (mGatt == null) {
             mGatt = device.connectGatt(this, false, gattCallback);
             scanLeDevice(false);// will stop after first device detection
         }
+    }
+    public void bleDisconnect() {
+        if (mGatt != null) {
+            mGatt.disconnect();
+            mGatt = null;
+        }
+    }
+
+    public void updateButton(final boolean val) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if(val) {
+                    btnConnect.setText("Disconnect");
+                } else {
+                    btnConnect.setText("Connect");
+                }
+            }
+        });
     }
 
     private final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
@@ -381,10 +407,12 @@ public class JoystickActivity extends AppCompatActivity {
             switch (newState) {
                 case BluetoothProfile.STATE_CONNECTED:
                     Log.i("gattCallback", "STATE_CONNECTED");
+                    updateButton(true);
                     gatt.discoverServices();
                     break;
                 case BluetoothProfile.STATE_DISCONNECTED:
                     Log.e("gattCallback", "STATE_DISCONNECTED");
+                    updateButton(false);
                     break;
                 default:
                     Log.e("gattCallback", "STATE_OTHER");
@@ -405,7 +433,7 @@ public class JoystickActivity extends AppCompatActivity {
                                          BluetoothGattCharacteristic
                                                  characteristic, int status) {
             Log.i("onCharacteristicRead", characteristic.toString());
-            gatt.disconnect();
+//            gatt.disconnect();
         }
     };
 
@@ -413,7 +441,7 @@ public class JoystickActivity extends AppCompatActivity {
         List<String> list = new ArrayList<String>();
 
         for (Iterator<BluetoothDevice> iter = this.bleDevices.iterator(); iter.hasNext(); ) {
-            list.add(iter.next().toString());
+            list.add(iter.next().getName());
         }
 
         ArrayAdapter<String> dataAdapter = new ArrayAdapter<String>(this,
@@ -423,7 +451,20 @@ public class JoystickActivity extends AppCompatActivity {
     }
 
     public void addBle(BluetoothDevice dev) {
-        this.bleDevices.add(dev);
+        boolean isExist = false;
+        for (Iterator<BluetoothDevice> iter = this.bleDevices.iterator(); iter.hasNext(); ) {
+            BluetoothDevice btdev = iter.next();
+            Log.d("addBle", dev.getName() + " - " + btdev.getName());
+            if (dev.getName().equals(btdev.getName())) {
+                isExist = true;
+                break;
+            }
+        }
+
+        if (!isExist) {
+            Log.d("addBle - add", dev.getName());
+            this.bleDevices.add(dev);
+        }
         updateBleList();
     }
 }

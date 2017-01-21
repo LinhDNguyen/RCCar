@@ -39,7 +39,7 @@
             android:layout_height="wrap_content"
             android:id="@+id/bleList"
             android:layout_weight="1"
-            android:minWidth="290dp"
+            android:minWidth="260dp"
             android:minHeight="50dp"
             android:background="@android:color/holo_blue_dark"
             android:entries="@array/bleListEx"
@@ -52,7 +52,8 @@
             android:id="@+id/btnConnect"
             android:layout_weight="1"
             android:minHeight="50dp"
-            android:minWidth="120dp" />
+            android:minWidth="150dp" />
+
     </LinearLayout>
 
     <TextView
