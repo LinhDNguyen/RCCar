@@ -33,10 +33,58 @@ import android.widget.ArrayAdapter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Iterator;
+import java.util.UUID;
+
 import android.util.Log;
 import android.content.pm.PackageManager;
 import android.content.Context;
 import android.content.Intent;
+
+class JoystickData {
+    protected int power;
+    protected int angle;
+    protected int direction;
+    protected boolean is_resent;
+
+    public JoystickData(int power, int angle, int direction) {
+        this.power = power;
+        this.angle = angle;
+        this.direction = direction;
+        this.is_resent = false;
+    }
+
+    public void setIs_resent(boolean is_resent) {
+        this.is_resent = is_resent;
+    }
+
+    public boolean is_resent() {
+        return is_resent;
+    }
+
+    public int getAngle() {
+        return angle;
+    }
+
+    public int getDirection() {
+        return direction;
+    }
+
+    public int getPower() {
+        return power;
+    }
+
+    public void setAngle(int angle) {
+        this.angle = angle;
+    }
+
+    public void setDirection(int direction) {
+        this.direction = direction;
+    }
+
+    public void setPower(int power) {
+        this.power = power;
+    }
+}
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
@@ -60,8 +108,24 @@ public class JoystickActivity extends AppCompatActivity {
     private ScanSettings settings;
     private List<ScanFilter> filters;
     private BluetoothGatt mGatt;
+    private BluetoothGattService mGattService;
+    private BluetoothGattCharacteristic mGattChar;
 
     private List<BluetoothDevice> bleDevices;
+
+    private JoystickData lastFailed = null;
+
+    Handler timerHandler = new Handler();
+    Runnable timerRunnable = new Runnable() {
+
+        @Override
+        public void run() {
+            if ((lastFailed != null) && (!lastFailed.is_resent())) {
+                lastFailed.setIs_resent(true);
+                bleWrite(0, 0);
+            }
+        }
+    };
 
     /**
      * Whether or not the system UI should be auto-hidden after
@@ -107,10 +171,8 @@ public class JoystickActivity extends AppCompatActivity {
             if (actionBar != null) {
                 actionBar.show();
             }
-//            mControlsView.setVisibility(View.VISIBLE);
         }
     };
-    private boolean mVisible;
     private final Runnable mHideRunnable = new Runnable() {
         @Override
         public void run() {
@@ -152,7 +214,6 @@ public class JoystickActivity extends AppCompatActivity {
         mBluetoothAdapter = bluetoothManager.getAdapter();
 
         // Init joystick
-        mVisible = true;
         mContentView = findViewById(R.id.fullscreen_content);
         joystick = (JoystickView) mContentView;
         angleTextView = (TextView) findViewById(R.id.txtAngle);
@@ -181,7 +242,9 @@ public class JoystickActivity extends AppCompatActivity {
 
             @Override
             public void onValueChanged(int angle, int power, int direction) {
-                // TODO Auto-generated method stub
+                if (mGatt == null) {
+                    return;
+                }
                 angleTextView.setText(" Angle: " + String.valueOf(angle) + "°");
                 powerTextView.setText(" Power: " + String.valueOf(power) + "%");
                 String directionStr = "Direction: ";
@@ -214,6 +277,7 @@ public class JoystickActivity extends AppCompatActivity {
                         directionStr += "CENTER";
                 }
                 directionTextView.setText(directionStr);
+                bleWrite(angle, power);
             }
         }, JoystickView.DEFAULT_LOOP_INTERVAL);
     }
@@ -234,7 +298,6 @@ public class JoystickActivity extends AppCompatActivity {
         if (actionBar != null) {
             actionBar.hide();
         }
-        mVisible = false;
 
         // Schedule a runnable to remove the status and navigation bar after a delay
         mHideHandler.removeCallbacks(mShowPart2Runnable);
@@ -277,13 +340,49 @@ public class JoystickActivity extends AppCompatActivity {
     }
 
     @Override
+    protected void onStop() {
+        super.onStop();
+    }
+
+    @Override
     protected void onDestroy() {
         if (mGatt == null) {
+            super.onDestroy();
             return;
         }
         mGatt.close();
         mGatt = null;
+        mGattChar = null;
+        mGattService = null;
+
         super.onDestroy();
+    }
+
+    private void bleWrite(int angle, int power) {
+        if (mGattChar == null) {
+            return;
+        }
+
+        // Write characteristic
+        short a = (short)angle;
+        short p = (short)power;
+
+        byte[] value = new byte[4];
+        value[1] = (byte)(a >> 8);
+        value[0] = (byte)(a & 0xff);
+        value[3] = (byte)(p >> 8);
+        value[2] = (byte)(p & 0xff);
+        mGattChar.setValue(value);
+        boolean res = mGatt.writeCharacteristic(mGattChar);
+        if (!res) {
+            Log.e("bleWrite", String.format("write a: %d, p: %d failed", a, p));
+            this.lastFailed = new JoystickData(power, angle, 0);
+            if ((power == 0) && (angle == 0)) {
+                timerHandler.removeCallbacks(timerRunnable);
+                timerHandler.postDelayed(timerRunnable, 5);
+            }
+            return;
+        }
     }
 
     @Override
@@ -424,16 +523,30 @@ public class JoystickActivity extends AppCompatActivity {
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             List<BluetoothGattService> services = gatt.getServices();
             Log.i("onServicesDiscovered", services.toString());
-            gatt.readCharacteristic(services.get(1).getCharacteristics().get
-                    (0));
+
+            mGattService = gatt.getService(UUID.fromString("12345678-1234-5678-1234-56789abcdef0"));
+            if (mGattService == null) {
+                Log.e("onServicesDiscovered", "RC CAR service not found!!!");
+                return;
+            }
+            Log.i("onServicesDiscovered", "RC CAR service: " + mGattService.toString());
+
+            mGattChar = mGattService.getCharacteristic(UUID.fromString("12345678-1234-5678-1234-56789abcdef1"));
+            if (mGattChar == null) {
+                Log.e("onServicesDiscovered", "RC CAR characteristic not found!!!");
+                return;
+            }
+            Log.i("onServicesDiscovered", "RC CAR characteristic: " + mGattChar.toString());
+
+            boolean res = gatt.readCharacteristic(mGattChar);
+            Log.i("onServicesDiscovered", String.format("Read characteristic: %s", res));
         }
 
         @Override
         public void onCharacteristicRead(BluetoothGatt gatt,
                                          BluetoothGattCharacteristic
                                                  characteristic, int status) {
-            Log.i("onCharacteristicRead", characteristic.toString());
-//            gatt.disconnect();
+            Log.i("onCharacteristicRead", characteristic.getValue().toString());
         }
     };
 
