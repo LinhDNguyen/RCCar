@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">RC Car</string>
+    <string-array name="bleListEx">
+        <item>RC CAR</item>
+        <item>Test 2</item>
+    </string-array>
+</resources>
