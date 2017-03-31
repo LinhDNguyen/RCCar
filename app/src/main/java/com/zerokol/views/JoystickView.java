@@ -8,6 +8,10 @@ import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
 
+import com.linhnguyen.rccar.core.OnJoystickListener;
+
+import java.util.EventObject;
+
 public class JoystickView extends View implements Runnable {
     // Constants
     private final double RAD = 57.2957795;
@@ -22,6 +26,7 @@ public class JoystickView extends View implements Runnable {
     public final static int LEFT_FRONT = 2;
     // Variables
     private OnJoystickMoveListener onJoystickMoveListener; // Listener
+    private OnJoystickListener mJoystickListener;
     private Thread thread = new Thread(this);
     private long loopInterval = DEFAULT_LOOP_INTERVAL;
     private int xPosition = 0; // Touch x position
@@ -161,6 +166,13 @@ public class JoystickView extends View implements Runnable {
             if (onJoystickMoveListener != null)
                 onJoystickMoveListener.onValueChanged(getAngle(), getPower(),
                         getDirection());
+            if (mJoystickListener != null) {
+                mJoystickListener.onTouchUp(false);
+            }
+        } else if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            if (mJoystickListener != null) {
+                mJoystickListener.onTouchUp(true);
+            }
         }
         if (onJoystickMoveListener != null
                 && event.getAction() == MotionEvent.ACTION_DOWN) {
@@ -274,5 +286,9 @@ public class JoystickView extends View implements Runnable {
         yPosition = (int) centerY;
 
         Thread.interrupted();
+    }
+
+    public void setOnJoystickUpListener(OnJoystickListener listener) {
+        mJoystickListener = listener;
     }
 }

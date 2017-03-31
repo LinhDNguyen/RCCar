@@ -34,4 +34,7 @@
     <string name="preferences_checkbox_summ">CheckBox Summary</string>
 
     <string name="btn_custom">Button in custom layout</string>
+
+
+    <string name="bluetooth_not_supported">Bluetooth is not supported</string>
 </resources>

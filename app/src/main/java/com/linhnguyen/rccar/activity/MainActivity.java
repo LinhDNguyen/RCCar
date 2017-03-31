@@ -1,7 +1,14 @@
 package com.linhnguyen.rccar.activity;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.AlertDialog;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothManager;
+import android.content.Context;
+import android.content.DialogInterface;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.design.widget.TabLayout;
@@ -19,20 +26,27 @@ import android.view.WindowManager;
 import android.widget.Toast;
 
 import com.linhnguyen.rccar.R;
+import com.linhnguyen.rccar.core.IOnScrollEnable;
 import com.linhnguyen.rccar.fragments.OneFragment;
 import com.linhnguyen.rccar.fragments.TwoFragment;
+import com.linhnguyen.rccar.view.CustomViewPager;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity{
     private TabLayout tabLayout;
-    private ViewPager viewPager;
+    private CustomViewPager viewPager;
     private int[] tabIcons = {
             R.drawable.ic_tab_favourite,
             R.drawable.ic_tab_call,
             R.drawable.ic_tab_contacts
     };
+    private static final int PERMISSION_REQUEST_COARSE_LOCATION = 1;
+
+    private BluetoothAdapter mBluetoothAdapter;
+    Handler mHandler;
+
     /**
      * Whether or not the system UI should be auto-hidden after
      * {@link #AUTO_HIDE_DELAY_MILLIS} milliseconds.
@@ -131,17 +145,26 @@ public class MainActivity extends AppCompatActivity{
         mHideHandler.postDelayed(mHideRunnable, delayMillis);
     }
 
+
     @Override
     public void onRequestPermissionsResult(int requestCode,
-                                           String permissions[], int[] grantResults) {
+                                           String permissions[],
+                                           int[] grantResults) {
         switch (requestCode) {
-            case 8: {
-                // grantResults[0] = -1
-                if (grantResults.length > 0
-                        && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    Log.i("permResult", "granted");
+            case PERMISSION_REQUEST_COARSE_LOCATION: {
+                if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    Log.d("ScanActivity", "coarse location permission granted");
                 } else {
-                    Log.e("permResult", "NOT granted");
+                    final AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                    builder.setTitle("Functionality limited");
+                    builder.setMessage("Since location access has not been granted, this app will not be able to discover beacons when in the background.");
+                    builder.setPositiveButton(android.R.string.ok, null);
+                    builder.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                        @Override
+                        public void onDismiss(DialogInterface dialog) {
+                        }
+                    });
+                    builder.show();
                 }
                 return;
             }
@@ -153,9 +176,10 @@ public class MainActivity extends AppCompatActivity{
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
-//        getSupportActionBar().hide();
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
         setContentView(R.layout.activity_main);
+        mHandler = new Handler();
 
         if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
             Toast.makeText(this, "BLE Not Supported",
@@ -163,7 +187,7 @@ public class MainActivity extends AppCompatActivity{
             finish();
         }
 
-        viewPager = (ViewPager) findViewById(R.id.viewpager);
+        viewPager = (CustomViewPager) findViewById(R.id.viewpager);
         setupViewPager(viewPager);
 
         tabLayout = (TabLayout) findViewById(R.id.tabs);
@@ -172,35 +196,81 @@ public class MainActivity extends AppCompatActivity{
 
         mContentView = findViewById(R.id.viewpager);
 
+        setupBLE();
+        setupEvents();
+    }
+
+    public void setupBLE() {
+        // Initializes a Bluetooth adapter.  For API level 18 and above, get a reference to
+        // BluetoothAdapter through BluetoothManager.
+        final BluetoothManager bluetoothManager =
+                (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
+        mBluetoothAdapter = bluetoothManager.getAdapter();
+
+        // Checks if Bluetooth is supported on the device.
+        if (mBluetoothAdapter == null) {
+            Toast.makeText(this, R.string.bluetooth_not_supported, Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            // Android M Permission check 
+            if (this.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                final AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                builder.setTitle("This app needs location access");
+                builder.setMessage("Please grant location access so this app can detect beacons.");
+                builder.setPositiveButton(android.R.string.ok, null);
+                builder.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                    @Override
+                    public void onDismiss(DialogInterface dialog) {
+                        requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION}, PERMISSION_REQUEST_COARSE_LOCATION);
+                    }
+                });
+                builder.show();
+            }
+        }
+    }
+
+    public void setupEvents() {
+        ViewPagerAdapter adapter = (ViewPagerAdapter)viewPager.getAdapter();
+        final OneFragment oneFrag = (OneFragment)adapter.getItem(0);
         viewPager.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
             @Override
             public void onPageScrolled(int position, float positionOffset, int positionOffsetPixels) {
                 // Clear Joystick if scroll to another tab
-                ViewPagerAdapter adapter = (ViewPagerAdapter)viewPager.getAdapter();
-                OneFragment oneFrag = (OneFragment)adapter.getItem(0);
                 oneFrag.setDefault();
             }
 
             @Override
             public void onPageSelected(int position) {
                 // Clear Joystick if scroll to another tab
-                ViewPagerAdapter adapter = (ViewPagerAdapter)viewPager.getAdapter();
-                OneFragment oneFrag = (OneFragment)adapter.getItem(0);
                 oneFrag.setDefault();
             }
 
             @Override
             public void onPageScrollStateChanged(int state) {
                 // Clear Joystick if scroll to another tab
-                ViewPagerAdapter adapter = (ViewPagerAdapter)viewPager.getAdapter();
-                OneFragment oneFrag = (OneFragment)adapter.getItem(0);
                 oneFrag.setDefault();
             }
         });
+
+        oneFrag.setScrollEnable(this.iScrollEnable);
     }
+
 
     public void onResume() {
         super.onResume();
+        ViewPagerAdapter adapter = (ViewPagerAdapter)viewPager.getAdapter();
+        final OneFragment oneFrag = (OneFragment)adapter.getItem(0);
+
+        mHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                oneFrag.setDefault();
+                oneFrag.scanLeDevice(true);
+            }
+        }, 500);
     }
 
     public void onStop() {
@@ -212,7 +282,7 @@ public class MainActivity extends AppCompatActivity{
         tabLayout.getTabAt(1).setIcon(tabIcons[1]);
     }
 
-    private void setupViewPager(ViewPager viewPager) {
+    private void setupViewPager(CustomViewPager viewPager) {
         ViewPagerAdapter adapter = new ViewPagerAdapter(getSupportFragmentManager());
         adapter.addFrag(new OneFragment(), "CAR Move");
         adapter.addFrag(new TwoFragment(), "CAR Sound");
@@ -247,4 +317,22 @@ public class MainActivity extends AppCompatActivity{
         }
     }
 
+    public BluetoothAdapter getBleAdapter() {
+        return mBluetoothAdapter;
+    }
+
+    private IOnScrollEnable iScrollEnable = new IOnScrollEnable() {
+        @Override
+        public void onEnable(boolean isEnable) {
+            if (!isEnable) {
+                // Tab scroll enable
+                viewPager.setPagingEnabled(true);
+                Log.d("MainActivity", "scroll enabled");
+            } else {
+                // Tab scroll disable
+                viewPager.setPagingEnabled(false);
+                Log.d("MainActivity", "scroll disabled");
+            }
+        }
+    };
 }
