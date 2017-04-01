@@ -22,6 +22,7 @@ import com.linhnguyen.rccar.R;
 import com.linhnguyen.rccar.activity.MainActivity;
 import com.linhnguyen.rccar.core.BleDeviceHolder;
 import com.linhnguyen.rccar.core.BleSpinnerAdapter;
+import com.linhnguyen.rccar.core.IOnListChanged;
 import com.linhnguyen.rccar.core.IOnScrollEnable;
 import com.linhnguyen.rccar.core.OnJoystickListener;
 import com.linhnguyen.rccar.service.BluetoothLeService;
@@ -45,6 +46,8 @@ public class OneFragment extends Fragment{
     private JoystickView joystick;
 
     private IOnScrollEnable iOnScrollEnable;
+    private int prevAngle = 0;
+    private int prevPower = 0;
 
     // Stops scanning after 20 seconds.
     private static final long SCAN_PERIOD = 20000;
@@ -93,8 +96,58 @@ public class OneFragment extends Fragment{
 
         joystick.setOnJoystickUpListener(iOnJoystickListener);
 
+        adapter.setOnChangedListener(listChanged);
+
+        joystick.setOnJoystickMoveListener(mJoystickListener, JoystickView.DEFAULT_LOOP_INTERVAL);
+
         return view;
     }
+
+    private JoystickView.OnJoystickMoveListener mJoystickListener = new JoystickView.OnJoystickMoveListener() {
+        @Override
+        public void onValueChanged(int angle, int power, int direction) {
+            int fAngle = 0;
+            int fPower = 0;
+
+            if (power > 40) {
+                if ((angle >=45) && (angle < 135)) {
+                    fAngle = 90;
+                } else if ((angle >= 135) && (angle < 225)) {
+                    fAngle = 180;
+                } else if ((angle >= 225) && (angle < 315)) {
+                    fAngle = 270;
+                } else {
+                    fAngle = 0;
+                }
+                if (power > 90) {
+                    fPower = 100;
+                } else if (power > 80) {
+                    fPower = 90;
+                } else if (power > 70) {
+                    fPower = 80;
+                } else {
+                    fPower = 70;
+                }
+            }
+
+            if ((fAngle != prevAngle) || (fPower != prevPower)) {
+                prevAngle = fAngle;
+                prevPower = fPower;
+            } else {
+                // No change, return
+                return;
+            }
+
+            byte[] data = new byte[4];
+            data[1] = (byte)((fAngle & 0xff00) >> 8);
+            data[0] = (byte)(fAngle & 0xff);
+            data[3] = 0;
+            data[2] = (byte)(fPower);
+            MainActivity avt = (MainActivity)getActivity();
+            avt.broadcastUpdate(BluetoothLeService.RCCAR_MOVE_DATA, data);
+            Log.i("OneFragment", "joystick changed " + String.valueOf(fAngle) + ":" + String.valueOf(fPower));
+        }
+    };
 
     public void display(int angle, int power) {
         if (txtAngle == null) return;
@@ -287,4 +340,16 @@ public class OneFragment extends Fragment{
     public void setScrollEnable(IOnScrollEnable listener) {
         iOnScrollEnable = listener;
     }
+
+    private IOnListChanged listChanged = new IOnListChanged() {
+        @Override
+        public void onListChanged(int itemCount) {
+            Log.d("OneFragment", "list changed to " + String.valueOf(itemCount) + " items");
+            if (itemCount > 0) {
+                btnConnect.setEnabled(true);
+            } else {
+                btnConnect.setEnabled(false);
+            }
+        }
+    };
 }

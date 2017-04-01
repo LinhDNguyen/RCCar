@@ -26,15 +26,16 @@ import java.util.HashMap;
  */
 public class RCCarAttribute {
     private static HashMap<String, String> attributes = new HashMap();
-    public static String CAR_MOVE_CHARRACTERISTIC_CONFIG = "12345678-1234-5678-1234-56789abcdef1";
-    public static String CAR_SOUND_CHARRACTERISTIC_CONFIG = "12345678-1234-5678-1234-56789abcdef1";
+    public static String CAR_SERVICE_UUID = "12345678-1234-5678-1234-56789abcdef0";
+    public static String CAR_MOVE_CHARACTERISTIC_CONFIG = "12345678-1234-5678-1234-56789abcdef1";
+    public static String CAR_SOUND_CHARACTERISTIC_CONFIG = "12345678-1234-5678-1234-56789abcdef2";
 
     static {
         // Sample Services.
         attributes.put("12345678-1234-5678-1234-56789abcdef0", "RC Car Control Service");
         // Sample Characteristics.
-        attributes.put(CAR_MOVE_CHARRACTERISTIC_CONFIG, "Car Move");
-        attributes.put(CAR_SOUND_CHARRACTERISTIC_CONFIG, "Car Sound");
+        attributes.put(CAR_MOVE_CHARACTERISTIC_CONFIG, "Car Move");
+        attributes.put(CAR_SOUND_CHARACTERISTIC_CONFIG, "Car Sound");
     }
 
     public static String lookup(String uuid, String defaultName) {

@@ -13,8 +13,10 @@ import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Binder;
 import android.os.IBinder;
 import android.support.v4.content.LocalBroadcastManager;
@@ -52,9 +54,15 @@ public class BluetoothLeService extends Service {
             "com.linhnguyen.rccar.le.ACTION_DATA_AVAILABLE";
     public final static String EXTRA_DATA =
             "com.linhnguyen.rccar.le.EXTRA_DATA";
+    public final static String RCCAR_MOVE_DATA =
+            "com.linhnguyen.rccar.le.MOVE_DATA";
+    public final static String RCCAR_SOUND_DATA =
+            "com.linhnguyen.rccar.le.SOUND_DATA";
 
     public final static UUID UUID_RCCAR_CONTROL =
-            UUID.fromString(RCCarAttribute.CAR_MOVE_CHARRACTERISTIC_CONFIG);
+            UUID.fromString(RCCarAttribute.CAR_MOVE_CHARACTERISTIC_CONFIG);
+    public final static UUID UUID_RCCAR_SOUND =
+            UUID.fromString(RCCarAttribute.CAR_SOUND_CHARACTERISTIC_CONFIG);
 
     private LocalBroadcastManager localBroadcastManager;
 
@@ -88,61 +96,51 @@ public class BluetoothLeService extends Service {
             } else {
                 Log.w(TAG, "onServicesDiscovered received: " + status);
             }
-        }
 
-        @Override
-        public void onCharacteristicRead(BluetoothGatt gatt,
-                                         BluetoothGattCharacteristic characteristic,
-                                         int status) {
-            if (status == BluetoothGatt.GATT_SUCCESS) {
-                broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
+            if (getMoveChar() == null) {
+                Log.e(TAG, "This BLE device is not compatible");
+                return;
             }
-        }
-
-        @Override
-        public void onCharacteristicChanged(BluetoothGatt gatt,
-                                            BluetoothGattCharacteristic characteristic) {
-            broadcastUpdate(ACTION_DATA_AVAILABLE, characteristic);
         }
     };
 
-    private void broadcastUpdate(final String action) {
-        final Intent intent = new Intent(action);
-//        sendBroadcast(intent);
-        localBroadcastManager.sendBroadcast(intent);
+    private BluetoothGattCharacteristic getMoveChar() {
+        BluetoothGattCharacteristic res = null;
+
+        BluetoothGattService mGattService = mBluetoothGatt.getService(UUID.fromString(RCCarAttribute.CAR_SERVICE_UUID));
+        if (mGattService == null) {
+            Log.e(TAG, "get move char: RC CAR service not found!!!");
+            return res;
+        }
+
+        res = mGattService.getCharacteristic(UUID.fromString(RCCarAttribute.CAR_MOVE_CHARACTERISTIC_CONFIG));
+        if (res == null) {
+            Log.e(TAG, "get move char: RC CAR Move Characteristic not found!!!");
+        }
+
+        return res;
     }
 
-    private void broadcastUpdate(final String action,
-                                 final BluetoothGattCharacteristic characteristic) {
-        final Intent intent = new Intent(action);
+    private BluetoothGattCharacteristic getSoundChar() {
+        BluetoothGattCharacteristic res = null;
 
-        // This is special handling for the Heart Rate Measurement profile.  Data parsing is
-        // carried out as per profile specifications:
-        // http://developer.bluetooth.org/gatt/characteristics/Pages/CharacteristicViewer.aspx?u=org.bluetooth.characteristic.heart_rate_measurement.xml
-        if (UUID_RCCAR_CONTROL.equals(characteristic.getUuid())) {
-            int flag = characteristic.getProperties();
-            int format = -1;
-            if ((flag & 0x01) != 0) {
-                format = BluetoothGattCharacteristic.FORMAT_UINT16;
-                Log.d(TAG, "Heart rate format UINT16.");
-            } else {
-                format = BluetoothGattCharacteristic.FORMAT_UINT8;
-                Log.d(TAG, "Heart rate format UINT8.");
-            }
-            final int heartRate = characteristic.getIntValue(format, 1);
-            Log.d(TAG, String.format("Received heart rate: %d", heartRate));
-            intent.putExtra(EXTRA_DATA, String.valueOf(heartRate));
-        } else {
-            // For all other profiles, writes the data formatted in HEX.
-            final byte[] data = characteristic.getValue();
-            if (data != null && data.length > 0) {
-                final StringBuilder stringBuilder = new StringBuilder(data.length);
-                for(byte byteChar : data)
-                    stringBuilder.append(String.format("%02X ", byteChar));
-                intent.putExtra(EXTRA_DATA, new String(data) + "\n" + stringBuilder.toString());
-            }
+        BluetoothGattService mGattService = mBluetoothGatt.getService(UUID.fromString(RCCarAttribute.CAR_SERVICE_UUID));
+        if (mGattService == null) {
+            Log.e(TAG, "get sound char: RC CAR service not found!!!");
+            return res;
         }
-        sendBroadcast(intent);
+
+        res = mGattService.getCharacteristic(UUID.fromString(RCCarAttribute.CAR_SOUND_CHARACTERISTIC_CONFIG));
+        if (res == null) {
+            Log.e(TAG, "get sound char: RC CAR Sound Characteristic not found!!!");
+        }
+
+        return res;
+    }
+
+    private void broadcastUpdate(final String action) {
+        final Intent intent = new Intent(action);
+        localBroadcastManager.sendBroadcast(intent);
     }
 
     public class LocalBinder extends Binder {
@@ -308,6 +306,49 @@ public class BluetoothLeService extends Service {
         super.onCreate();
 
         localBroadcastManager = LocalBroadcastManager.getInstance(this);
+
+        localBroadcastManager.registerReceiver(mGattCarReceiver, makeGattRccarIntentFilter());
     }
+
+    private static IntentFilter makeGattRccarIntentFilter() {
+        final IntentFilter intentFilter = new IntentFilter();
+        intentFilter.addAction(BluetoothLeService.RCCAR_SOUND_DATA);
+        intentFilter.addAction(BluetoothLeService.RCCAR_MOVE_DATA);
+        return intentFilter;
+    }
+
+    private final BroadcastReceiver mGattCarReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            final String action = intent.getAction();
+            Log.d(TAG, "Service received message: " + action);
+            if (BluetoothLeService.RCCAR_MOVE_DATA.equals(action)) {
+                BluetoothGattCharacteristic mGattChar = getMoveChar();
+                if (mGattChar == null) {
+                    disconnect();
+                }
+                Log.i(TAG, "GATT CAR MOVE");
+
+                byte[] value = intent.getByteArrayExtra(BluetoothLeService.EXTRA_DATA);
+                mGattChar.setValue(value);
+                boolean res = mBluetoothGatt.writeCharacteristic(mGattChar);
+                if (!res) {
+                    Log.e(TAG, "Write move data " + value.toString() + " failed");
+                }
+            } else if (BluetoothLeService.RCCAR_SOUND_DATA.equals(action)) {
+                BluetoothGattCharacteristic mGattChar = getSoundChar();
+                if (mGattChar == null) {
+                    disconnect();
+                }
+                Log.i(TAG, "GATT CAR SOUND");
+                byte[] value = intent.getByteArrayExtra(BluetoothLeService.EXTRA_DATA);
+                mGattChar.setValue(value);
+                boolean res = mBluetoothGatt.writeCharacteristic(mGattChar);
+                if (!res) {
+                    Log.e(TAG, "Write sound data " + value.toString() + " failed");
+                }
+            }
+        }
+    };
 }
 

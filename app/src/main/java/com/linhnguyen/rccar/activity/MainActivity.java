@@ -56,9 +56,7 @@ public class MainActivity extends AppCompatActivity{
     private BluetoothAdapter mBluetoothAdapter;
     private BluetoothLeService mBluetoothLeService;
     Handler mHandler;
-    private boolean mConnected = false;
-    LocalBroadcastManager bManager;
-    private BroadcastReceiver broadcastReceiver;
+    private char mVolume = 100;
 
     /**
      * Whether or not the system UI should be auto-hidden after
@@ -151,8 +149,6 @@ public class MainActivity extends AppCompatActivity{
     // ACTION_GATT_CONNECTED: connected to a GATT server.
     // ACTION_GATT_DISCONNECTED: disconnected from a GATT server.
     // ACTION_GATT_SERVICES_DISCOVERED: discovered GATT services.
-    // ACTION_DATA_AVAILABLE: received data from the device.  This can be a result of read
-    //                        or notification operations.
     private final BroadcastReceiver mGattUpdateReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -166,9 +162,6 @@ public class MainActivity extends AppCompatActivity{
                 // TODO
             } else if (BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)) {
                 Log.i(TAG, "GATT service discovered");
-                // TODO
-            } else if (BluetoothLeService.ACTION_DATA_AVAILABLE.equals(action)) {
-                Log.i(TAG, "GATT data available");
                 // TODO
             }
         }
@@ -269,6 +262,33 @@ public class MainActivity extends AppCompatActivity{
 
         LocalBroadcastManager.getInstance(this).registerReceiver((mGattUpdateReceiver),
                 makeGattUpdateIntentFilter());
+    }
+
+    public void broadcastUpdate(final String action) {
+        final Intent intent = new Intent(action);
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
+    }
+
+    public void broadcastUpdate(final String action, byte[] data) {
+        final Intent intent = new Intent(action);
+        intent.putExtra(BluetoothLeService.EXTRA_DATA, data);
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
+    }
+
+    public void broadcastUpdate(final String action, String data) {
+        final Intent intent = new Intent(action);
+        Log.d(TAG, "send with extra data " + data);
+        if (action.equals(BluetoothLeService.RCCAR_SOUND_DATA)) {
+            int soundCode = Integer.valueOf(data);
+            byte[] finalData = new byte[2];
+            finalData[1] = (byte)mVolume;
+            finalData[0] = (byte)soundCode;
+            intent.putExtra(BluetoothLeService.EXTRA_DATA, finalData);
+            Log.d(TAG, "sound data " + data + ":" + String.valueOf(mVolume));
+        } else {
+            intent.putExtra(BluetoothLeService.EXTRA_DATA, data);
+        }
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
     }
 
     public void setupBLE() {
@@ -422,7 +442,6 @@ public class MainActivity extends AppCompatActivity{
         intentFilter.addAction(BluetoothLeService.ACTION_GATT_CONNECTED);
         intentFilter.addAction(BluetoothLeService.ACTION_GATT_DISCONNECTED);
         intentFilter.addAction(BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED);
-        intentFilter.addAction(BluetoothLeService.ACTION_DATA_AVAILABLE);
         return intentFilter;
     }
 }

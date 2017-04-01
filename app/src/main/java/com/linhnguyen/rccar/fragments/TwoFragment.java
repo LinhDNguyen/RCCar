@@ -12,9 +12,11 @@ import android.widget.AdapterView;
 import android.widget.GridView;
 
 import com.linhnguyen.rccar.R;
+import com.linhnguyen.rccar.activity.MainActivity;
 import com.linhnguyen.rccar.core.CarSoundViewAdapter;
 import com.linhnguyen.rccar.core.ImageItem;
 import com.linhnguyen.rccar.core.ResourceUtils;
+import com.linhnguyen.rccar.service.BluetoothLeService;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -51,6 +53,8 @@ public class TwoFragment extends Fragment{
                 ImageItem item = (ImageItem) parent.getItemAtPosition(position);
                 // TODO: action for item clicked
                 Log.i("TwoFragment", "item " + item.getTitle() + " clicked, code: " + item.getItemId());
+                MainActivity avt = (MainActivity)getActivity();
+                avt.broadcastUpdate(BluetoothLeService.RCCAR_SOUND_DATA, item.getItemId());
             }});
 
         return view;
@@ -65,7 +69,7 @@ public class TwoFragment extends Fragment{
         Iterator<String> it = keys.iterator();
         while (it.hasNext()) {
             String key = it.next();
-            Bitmap bitmap = BitmapFactory.decodeResource(getResources(), getResources().getIdentifier(key, "drawable", getActivity().getPackageName()));
+            Bitmap bitmap = BitmapFactory.decodeResource(getResources(), getResources().getIdentifier("icon_" + key, "drawable", getActivity().getPackageName()));
             imageItems.add(new ImageItem(bitmap, soundMap.get(key), key));
         }
 

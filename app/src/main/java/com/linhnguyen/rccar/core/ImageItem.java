@@ -15,7 +15,7 @@ public class ImageItem {
         super();
         this.image = image;
         this.title = title;
-        this.item_id = "default_icon";
+        this.item_id = "icon_1";
     }
 
     public ImageItem(Bitmap image, String title, String item_id) {

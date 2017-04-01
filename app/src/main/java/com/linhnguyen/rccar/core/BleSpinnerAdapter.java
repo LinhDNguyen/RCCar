@@ -18,6 +18,8 @@ public class BleSpinnerAdapter extends ArrayAdapter<BleDeviceHolder> {
     // Your custom values for the spinner (User)
     private boolean hasData = false;
 
+    private IOnListChanged onChanged;
+
     public BleSpinnerAdapter(Context context, int textViewResourceId,
                              List<BleDeviceHolder> values) {
         super(context, textViewResourceId, values);
@@ -44,11 +46,15 @@ public class BleSpinnerAdapter extends ArrayAdapter<BleDeviceHolder> {
             Log.d("BleSpinnerAdapter", "Add " + object.device.getName() + "[" + object.device.getAddress() + "] added");
         }
         hasData = true;
+        if (onChanged != null) { onChanged.onListChanged(getCount());}
     }
 
     @Override
     public void clear() {
         super.clear();
         hasData = false;
+        if (onChanged != null) { onChanged.onListChanged(0);}
     }
+
+    public void setOnChangedListener(IOnListChanged listener) {onChanged = listener;}
 }
