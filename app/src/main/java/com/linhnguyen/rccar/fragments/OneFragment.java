@@ -19,10 +19,12 @@ import android.widget.Spinner;
 import android.widget.TextView;
 
 import com.linhnguyen.rccar.R;
+import com.linhnguyen.rccar.activity.MainActivity;
 import com.linhnguyen.rccar.core.BleDeviceHolder;
 import com.linhnguyen.rccar.core.BleSpinnerAdapter;
 import com.linhnguyen.rccar.core.IOnScrollEnable;
 import com.linhnguyen.rccar.core.OnJoystickListener;
+import com.linhnguyen.rccar.service.BluetoothLeService;
 import com.zerokol.views.JoystickView;
 
 import java.util.ArrayList;
@@ -150,18 +152,21 @@ public class OneFragment extends Fragment{
         @Override
         public void onClick(View v) {
             Button btn = (Button)v;
+            MainActivity atv = (MainActivity)getActivity();
+            BluetoothLeService bleSrv = atv.getBleService();
             // Start scan
-            Log.i("MainActivity", btn.getText() + " clicked");
+            Log.i("MainActivity", btn.getText() + " clicked, current device: " + getSelectedDevice().getAddress());
 
             if (btn.getText().equals("Connect")) {
                 // Connect BLE device
-
+                bleSrv.connect(getSelectedDevice().getAddress());
 
                 // Done, change text
                 onBleConnected();
             } else {
                 // Disconnect Ble device
 
+                bleSrv.disconnect();
 
                 // Done, change text
                 onBleDisconnected();
