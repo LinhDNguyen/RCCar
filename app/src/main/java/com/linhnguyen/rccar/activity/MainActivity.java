@@ -153,16 +153,18 @@ public class MainActivity extends AppCompatActivity{
         @Override
         public void onReceive(Context context, Intent intent) {
             final String action = intent.getAction();
+            ViewPagerAdapter adapter = (ViewPagerAdapter)viewPager.getAdapter();
+            final OneFragment oneFrag = (OneFragment)adapter.getItem(0);
             Log.d(TAG, "Broadcast received: " + action);
             if (BluetoothLeService.ACTION_GATT_CONNECTED.equals(action)) {
                 Log.i(TAG, "GATT connected");
-                // TODO
+                oneFrag.onBleConnected();
             } else if (BluetoothLeService.ACTION_GATT_DISCONNECTED.equals(action)) {
                 Log.i(TAG, "GATT disconnected");
-                // TODO
+                oneFrag.onBleDisconnected();
             } else if (BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)) {
                 Log.i(TAG, "GATT service discovered");
-                // TODO
+                oneFrag.onBleReady();
             }
         }
     };

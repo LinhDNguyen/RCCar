@@ -108,13 +108,17 @@ public class OneFragment extends Fragment{
         public void onValueChanged(int angle, int power, int direction) {
             int fAngle = 0;
             int fPower = 0;
+            int nAngle = angle;
+            if (angle < 0) {
+                nAngle = 360 + angle;
+            }
 
             if (power > 40) {
-                if ((angle >=45) && (angle < 135)) {
+                if ((nAngle >=45) && (nAngle < 135)) {
                     fAngle = 90;
-                } else if ((angle >= 135) && (angle < 225)) {
+                } else if ((nAngle >= 135) && (nAngle < 225)) {
                     fAngle = 180;
-                } else if ((angle >= 225) && (angle < 315)) {
+                } else if ((nAngle >= 225) && (nAngle < 315)) {
                     fAngle = 270;
                 } else {
                     fAngle = 0;
@@ -145,7 +149,7 @@ public class OneFragment extends Fragment{
             data[2] = (byte)(fPower);
             MainActivity avt = (MainActivity)getActivity();
             avt.broadcastUpdate(BluetoothLeService.RCCAR_MOVE_DATA, data);
-            Log.i("OneFragment", "joystick changed " + String.valueOf(fAngle) + ":" + String.valueOf(fPower));
+            Log.i("OneFragment", "joystick changed " + String.valueOf(fAngle) + ":" + String.valueOf(fPower) + " (" + String.valueOf(angle) + ":" + String.valueOf(power) + ")");
         }
     };
 
@@ -215,14 +219,14 @@ public class OneFragment extends Fragment{
                 bleSrv.connect(getSelectedDevice().getAddress());
 
                 // Done, change text
-                onBleConnected();
+//                onBleConnected();
             } else {
                 // Disconnect Ble device
 
                 bleSrv.disconnect();
 
                 // Done, change text
-                onBleDisconnected();
+//                onBleDisconnected();
             }
         }
     };
@@ -245,6 +249,10 @@ public class OneFragment extends Fragment{
         bleSpinner.setEnabled(true);
         joystick.setEnabled(false);
         mConnected = false;
+    }
+
+    public void onBleReady() {
+        btnScan.setText("Ready");
     }
 
     private void setScanState(boolean isIdle) {

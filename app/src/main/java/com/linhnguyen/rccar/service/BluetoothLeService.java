@@ -39,6 +39,7 @@ public class BluetoothLeService extends Service {
     private String mBluetoothDeviceAddress;
     private BluetoothGatt mBluetoothGatt;
     private int mConnectionState = STATE_DISCONNECTED;
+    private boolean mGattReady = false;
 
     private static final int STATE_DISCONNECTED = 0;
     private static final int STATE_CONNECTING = 1;
@@ -80,11 +81,13 @@ public class BluetoothLeService extends Service {
                 // Attempts to discover services after successful connection.
                 Log.i(TAG, "Attempting to start service discovery:" +
                         mBluetoothGatt.discoverServices());
+                mGattReady = false;
 
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 intentAction = ACTION_GATT_DISCONNECTED;
                 mConnectionState = STATE_DISCONNECTED;
                 Log.i(TAG, "Disconnected from GATT server.");
+                mGattReady = false;
                 broadcastUpdate(intentAction);
             }
         }
@@ -93,12 +96,14 @@ public class BluetoothLeService extends Service {
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
             if (status == BluetoothGatt.GATT_SUCCESS) {
                 broadcastUpdate(ACTION_GATT_SERVICES_DISCOVERED);
+                mGattReady = true;
             } else {
                 Log.w(TAG, "onServicesDiscovered received: " + status);
             }
 
             if (getMoveChar() == null) {
                 Log.e(TAG, "This BLE device is not compatible");
+                mGattReady = false;
                 return;
             }
         }
@@ -201,6 +206,7 @@ public class BluetoothLeService extends Service {
      *         callback.
      */
     public boolean connect(final String address) {
+        mGattReady = false;
         if (mBluetoothAdapter == null || address == null) {
             Log.w(TAG, "BluetoothAdapter not initialized or unspecified address.");
             return false;
@@ -239,6 +245,7 @@ public class BluetoothLeService extends Service {
      * callback.
      */
     public void disconnect() {
+        mGattReady = false;
         if (mBluetoothAdapter == null || mBluetoothGatt == null) {
             Log.w(TAG, "BluetoothAdapter not initialized");
             return;
@@ -322,6 +329,10 @@ public class BluetoothLeService extends Service {
         public void onReceive(Context context, Intent intent) {
             final String action = intent.getAction();
             Log.d(TAG, "Service received message: " + action);
+            if (!mGattReady) {
+                Log.i(TAG, "Gatt is not discovered. Ignore.");
+                return;
+            }
             if (BluetoothLeService.RCCAR_MOVE_DATA.equals(action)) {
                 BluetoothGattCharacteristic mGattChar = getMoveChar();
                 if (mGattChar == null) {
@@ -330,6 +341,7 @@ public class BluetoothLeService extends Service {
                 Log.i(TAG, "GATT CAR MOVE");
 
                 byte[] value = intent.getByteArrayExtra(BluetoothLeService.EXTRA_DATA);
+                Log.d(TAG, "car move data: " + value.toString());
                 mGattChar.setValue(value);
                 boolean res = mBluetoothGatt.writeCharacteristic(mGattChar);
                 if (!res) {
