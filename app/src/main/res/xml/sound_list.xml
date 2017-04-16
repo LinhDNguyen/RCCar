@@ -1,6 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <map linked="true">
-    <entry key="1">Default</entry>
-    <entry key="2">Police Car</entry>
-    <entry key="3">Ambulance</entry>
+    <entry key="1">Cat</entry>
+    <entry key="2">Chicken young</entry>
+    <entry key="3">Chicken</entry>
+    <entry key="4">Cow</entry>
+    <entry key="5">Dog</entry>
+    <entry key="6">Donkey</entry>
+    <entry key="7">Duck</entry>
+    <entry key="8">Elephant</entry>
+    <entry key="9">Fog</entry>
+    <entry key="10">Goat</entry>
+    <entry key="11">Horse</entry>
+    <entry key="12">Monkey</entry>
+    <entry key="13">Pig</entry>
+    <entry key="14">Rooster</entry>
+    <entry key="15">Sheep</entry>
 </map>
